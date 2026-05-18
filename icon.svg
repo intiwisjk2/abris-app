@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <style>
+    .bg { fill: #f2e0ce; }
+    .a  { stroke: #a83318; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #1a1a1f; }
+      .a  { stroke: #e87a4f; }
+    }
+  </style>
+  <rect class="bg" width="512" height="512" rx="112"/>
+  <g class="a" stroke-width="56" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <line x1="256" y1="87"  x2="67"  y2="425"/>
+    <line x1="256" y1="87"  x2="445" y2="425"/>
+    <line x1="148" y1="287" x2="364" y2="287"/>
+  </g>
+</svg>

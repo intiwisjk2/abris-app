@@ -1,0 +1,26 @@
+{
+  "name": "Абрис",
+  "short_name": "Абрис",
+  "description": "Коротко о главном — СВО, Россия, мир",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a1a1f",
+  "theme_color": "#1a1a1f",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
