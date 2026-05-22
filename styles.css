@@ -261,6 +261,10 @@ html.no-scrollbar::-webkit-scrollbar { display: none; }
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
 }
+.update-chip.is-offline {
+  color: var(--highlight);
+  border-color: color-mix(in srgb, var(--highlight) 35%, var(--border));
+}
 .update-chip-icon {
   display: block;
   flex-shrink: 0;
@@ -877,12 +881,12 @@ html.theme-dark .new-badge {
   align-items: center;
   gap: 7px;
   font-family: var(--font);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
-  padding: 10px 16px;
+  padding: 11px 18px;
   border-radius: 999px;
   cursor: pointer;
   box-shadow: var(--shadow), 0 4px 24px -6px rgba(0, 0, 0, 0.18);
@@ -2113,4 +2117,71 @@ html.theme-dark .ob-illustration .ob-orbit-ticks { stroke-opacity: 0.24; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
+}
+
+/* ── Settings version row ── */
+.settings-version-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.settings-version-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.settings-version-value {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+/* ── Splash screen ── */
+#splash {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  pointer-events: none;
+  transition: opacity 260ms ease;
+}
+#splash.is-leaving {
+  opacity: 0;
+}
+.splash-logo {
+  width: 88px;
+  height: 88px;
+  border-radius: 20px;
+  overflow: hidden;
+  animation: logo-pop 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: 40ms;
+}
+/* В тёмной теме SVG-фон совпадает с --bg, переопределяем через CSS */
+@media (prefers-color-scheme: dark) {
+  :root:not(.theme-light) .splash-logo .sl-bg { fill: #232329; }
+}
+html.theme-dark .splash-logo .sl-bg { fill: #232329; }
+
+.splash-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  animation: title-in 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 160ms;
+}
+@keyframes title-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
 }

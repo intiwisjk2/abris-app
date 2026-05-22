@@ -160,7 +160,17 @@
 
   // Загрузить enrollment-файл и получить master_key
   const loadMasterKey = async (deviceId, password) => {
-    const res = await fetch(`enrollments/${deviceId}.bin`, { cache: 'no-store' });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    let res;
+    try {
+      res = await fetch(`enrollments/${deviceId}.bin`, { cache: 'no-store', signal: controller.signal });
+    } catch (e) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') throw Object.assign(new Error('timeout'), { code: 'timeout' });
+      throw e;
+    }
+    clearTimeout(timer);
     if (res.status === 404) throw Object.assign(new Error('not-enrolled'), { code: 'not-enrolled' });
     if (!res.ok) throw new Error(`enrollment-fetch-error: ${res.status}`);
     const enrollmentBytes = await res.arrayBuffer();
@@ -241,12 +251,7 @@
 
   const getLastUpdated = () => {
     const v = localStorage.getItem(LAST_UPDATED_KEY);
-    if (!v) {
-      const now = new Date().toISOString();
-      localStorage.setItem(LAST_UPDATED_KEY, now);
-      return now;
-    }
-    return v;
+    return v || new Date(0).toISOString();
   };
   const setLastUpdated = (iso) => localStorage.setItem(LAST_UPDATED_KEY, iso);
 
@@ -270,25 +275,51 @@
   const doRefresh = async (chip, textEl, cardsRoot) => {
     if (!document.contains(chip)) return;
 
-    // Офлайн: сбрасываем таймер (чтобы не зациклиться при каждом запуске),
-    // но не делаем сетевых запросов и не меняем UI
-    if (!navigator.onLine) {
-      setLastUpdated(new Date().toISOString());
-      scheduleAutoRefresh(chip, textEl, cardsRoot);
-      return;
-    }
-
     const animText = (txt) => {
       textEl.classList.remove('text-anim');
-      void textEl.offsetWidth; // force reflow
+      void textEl.offsetWidth;
       textEl.textContent = txt;
       textEl.classList.add('text-anim');
     };
+
+    if (!navigator.onLine) {
+      chip.classList.add('is-offline');
+      animText('Офлайн');
+      setTimeout(() => {
+        if (document.contains(chip)) {
+          chip.classList.remove('is-offline');
+          animText(lastUpdatedAgo(getLastUpdated()));
+        }
+      }, 2500);
+      if (updateChipTimer) clearTimeout(updateChipTimer);
+      updateChipTimer = setTimeout(() => doRefresh(chip, textEl, cardsRoot), 30 * 60 * 1000);
+      return;
+    }
 
     chip.classList.add('is-refreshing');
     chip.disabled = true;
     animText('Обновляем...');
 
+    if (REQUIRE_ENCRYPTION && masterKey === null) {
+      const deviceId = localStorage.getItem(AUTH_DEVICE_KEY);
+      const password = localStorage.getItem(AUTH_PASSWORD_KEY);
+      if (deviceId && password) {
+        try {
+          masterKey = await loadMasterKey(deviceId, password);
+        } catch (e) {
+          if (document.contains(chip)) {
+            chip.classList.remove('is-refreshing');
+            chip.disabled = false;
+            animText(lastUpdatedAgo(getLastUpdated()));
+          }
+          if (updateChipTimer) clearTimeout(updateChipTimer);
+          updateChipTimer = setTimeout(() => doRefresh(chip, textEl, cardsRoot), 30 * 60 * 1000);
+          return;
+        }
+      }
+    }
+
+    const prevLoaded = articlesLoaded;
     let changed = false;
     if (appDb) {
       try {
@@ -296,6 +327,7 @@
         if (changed) window.NEWS = await dbGetAll(appDb);
       } catch (e) { /* сетевая ошибка — данные не изменились */ }
     }
+    articlesLoaded = true;
 
     if (!document.contains(chip)) return;
     const now = new Date().toISOString();
@@ -303,7 +335,7 @@
     chip.classList.remove('is-refreshing');
     chip.disabled = false;
     animText(lastUpdatedAgo(now));
-    if (changed) renderCards(cardsRoot);
+    if (changed || !prevLoaded) renderCards(cardsRoot);
     scheduleAutoRefresh(chip, textEl, cardsRoot);
   };
 
@@ -736,6 +768,8 @@
   const openSettings = () => {
     refreshSizePicker();
     refreshThemePicker();
+    const vEl = settingsModal.querySelector('.js-settings-version');
+    if (vEl) vEl.textContent = localStorage.getItem(VERSION_KEY) || '—';
     openModal(settingsModal);
   };
 
@@ -1533,6 +1567,8 @@
           isChecking = false;
           if (err.code === 'not-enrolled') {
             showError('Устройство не зарегистрировано. Отправьте код владельцу.');
+          } else if (err.code === 'timeout') {
+            showError('Нет соединения с сервером — попробуйте позже');
           } else {
             showError('Неверный пароль');
           }
@@ -1793,6 +1829,20 @@
       } catch (e) { console.warn(`[sync] Ошибка статьи ${id}:`, e); }
     }));
 
+    // Удалить из SW-кэша файлы статей, которых больше нет на сервере
+    if ('caches' in window) {
+      try {
+        const cache = await caches.open('abris-articles');
+        const keys = await cache.keys();
+        await Promise.all(keys.map((req) => {
+          const match = new URL(req.url).pathname.match(/\/articles\/([\w-]+)\.(enc|json)$/);
+          if (match && match[1] !== 'index' && !serverIds.has(match[1])) {
+            return cache.delete(req);
+          }
+        }));
+      } catch (e) { /* SW кэш недоступен */ }
+    }
+
     return changed;
   };
 
@@ -1862,54 +1912,24 @@
 
   window.addEventListener('hashchange', route);
 
-  // Инициализация: загрузить из IndexedDB → отрисовать → синхронизировать с сервером
   openDB().then(async (db) => {
     appDb = db;
-    // 1. Загрузить кэшированные статьи из IndexedDB
     const cached = await dbGetAll(db);
     window.NEWS = cached.length > 0 ? cached : [];
+    if (cached.length > 0) articlesLoaded = true;
 
-    // Если уже есть статьи — скелетон не нужен
-    const wasEmpty = cached.length === 0;
-    if (!wasEmpty) articlesLoaded = true;
-
-    // Если авторизован в боевом режиме — восстанавливаем master_key
-    if (REQUIRE_ENCRYPTION && isAuthorized()) {
-      const deviceId = localStorage.getItem(AUTH_DEVICE_KEY);
-      const password = localStorage.getItem(AUTH_PASSWORD_KEY);
-      if (deviceId && password) {
-        try {
-          masterKey = await loadMasterKey(deviceId, password);
-        } catch (e) {
-          // Офлайн или enrollment удалён — продолжаем без masterKey
-          // Статьи из IndexedDB всё равно покажем (они уже расшифрованы)
-        }
-      }
-    }
-
-    // 2. Первый рендер (из кэша или скелетон если пусто)
     route();
-
-    // 3. Синхронизация с сервером в фоне
-    const canSync = !REQUIRE_ENCRYPTION || masterKey !== null;
-    const changed = canSync ? await syncArticles(db) : false;
-
-    // Снять скелетон и обновить список
-    articlesLoaded = true;
-    if (changed) window.NEWS = await dbGetAll(db);
-    if (changed || wasEmpty) {
-      const r = parseRoute();
-      if (r.name === 'list') {
-        const cardsRoot = document.querySelector('.cards');
-        if (cardsRoot) renderCards(cardsRoot);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const splash = document.getElementById('splash');
+      if (splash) {
+        splash.classList.add('is-leaving');
+        setTimeout(() => splash.remove(), 280);
       }
-    }
+    }));
 
-    // Проверка версии приложения (и затем каждые 5 часов)
-    await checkVersion();
+    checkVersion();
     setInterval(checkVersion, AUTO_REFRESH_INTERVAL);
   }).catch((err) => {
-    // IndexedDB недоступна
     console.warn('IndexedDB unavailable:', err);
     articlesLoaded = true;
     window.NEWS = window.NEWS || [];
