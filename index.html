@@ -6,11 +6,6 @@
     <meta name="theme-color" content="#1a1a1f" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#fafaf7" media="(prefers-color-scheme: light)" />
 
-    <!-- Без кэширования (на этапе разработки) -->
-    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-
     <!-- PWA -->
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="./icon.svg" />
@@ -289,7 +284,7 @@
       </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+    <script src="./marked.min.js"></script>
     <script src="./app.js"></script>
     <script>
       if ('serviceWorker' in navigator) {

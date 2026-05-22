@@ -700,8 +700,8 @@ html.theme-dark .new-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   color: var(--text-2);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -745,9 +745,9 @@ html.theme-dark .new-badge {
   align-items: center;
   justify-content: center;
   gap: 0;
-  min-width: 44px;
-  height: 44px;
-  padding: 0 12px;
+  min-width: 48px;
+  height: 48px;
+  padding: 0 13px;
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text-2);
@@ -774,11 +774,11 @@ html.theme-dark .new-badge {
 }
 /* Expanded state: shows text alongside icon */
 .anchor-delete-float.has-text {
-  padding: 0 14px 0 12px;
+  padding: 0 16px 0 13px;
 }
 .anchor-delete-float-text {
   font-family: var(--font);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -801,12 +801,12 @@ html.theme-dark .new-badge {
   align-items: center;
   gap: 7px;
   font-family: var(--font);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-2);
   background: var(--surface);
   border: 1px solid var(--border);
-  padding: 10px 16px;
+  padding: 11px 18px;
   border-radius: 999px;
   cursor: pointer;
   pointer-events: auto;
@@ -838,8 +838,8 @@ html.theme-dark .new-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   color: var(--text-2);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -863,7 +863,9 @@ html.theme-dark .new-badge {
   pointer-events: none;
   transform: scale(0.78) translateY(16px);
 }
-.back-float svg { display: block; }
+.back-float svg { display: block; width: 20px; height: 20px; }
+.anchor-add-float svg { width: 18px; height: 18px; }
+.anchor-delete-float > svg { width: 17px; height: 17px; }
 
 /* Scroll-to-top float — pill button bottom-left, list screen only */
 .scroll-top-float {
@@ -1160,6 +1162,7 @@ html.theme-dark .auth-input.is-error:focus { border-color: #ff8a7a; }
 }
 /* display:flex перекрывает [hidden] — нужно явно запретить */
 .auth-paste-error[hidden] { display: none; }
+.new-badge[hidden] { display: none; }
 .auth-paste-error.is-visible {
   animation: auth-step-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -1934,6 +1937,55 @@ html.theme-dark .ob-illustration .ob-orbit-ticks { stroke-opacity: 0.24; }
   animation: auth-step-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: 160ms;
 }
+.update-version {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 18px;
+  font-family: var(--mono, monospace);
+  font-size: 13px;
+}
+.update-version-old {
+  position: relative;
+  color: var(--text-3);
+  animation: auth-step-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 220ms;
+}
+.update-version-old::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 1.5px;
+  background: var(--text-3);
+  width: 0;
+  animation: update-strikethrough 280ms ease both;
+  animation-delay: 400ms;
+}
+@keyframes update-strikethrough {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+.update-version-arrow {
+  color: var(--accent);
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0;
+  transform: translateX(-6px) scale(0.7);
+  animation: update-arrow-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: 520ms;
+}
+@keyframes update-arrow-in {
+  from { opacity: 0; transform: translateX(-6px) scale(0.7); }
+  to   { opacity: 1; transform: none; }
+}
+.update-version-new {
+  color: var(--text-1);
+  font-weight: 600;
+  animation: auth-step-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 620ms;
+}
+
 .update-progress {
   width: 160px;
   height: 3px;
@@ -1941,7 +1993,7 @@ html.theme-dark .ob-illustration .ob-orbit-ticks { stroke-opacity: 0.24; }
   border-radius: 999px;
   overflow: hidden;
   animation: auth-step-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: 250ms;
+  animation-delay: 380ms;
 }
 .update-progress-fill {
   height: 100%;

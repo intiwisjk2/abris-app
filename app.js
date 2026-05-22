@@ -111,6 +111,7 @@
 
   // ---------- Криптография ----------
   let masterKey = null; // CryptoKey (non-extractable), хранится только в памяти
+  let appDb = null;     // IndexedDB instance, доступен после инициализации
 
   const hexToBytes = (hex) => {
     const bytes = new Uint8Array(hex.length / 2);
@@ -191,7 +192,7 @@
       const stored = localStorage.getItem(VERSION_KEY);
       localStorage.setItem(VERSION_KEY, version);
       // Если версия изменилась (и это не первый запуск) — запускаем обновление
-      if (stored !== null && stored !== version) triggerUpdate();
+      if (stored !== null && stored !== version) triggerUpdate(stored, version);
     } catch (e) { /* офлайн */ }
   };
 
@@ -264,8 +265,18 @@
     if (updateChipInterval) { clearInterval(updateChipInterval); updateChipInterval = null; }
   };
 
-  const doRefresh = (chip, textEl, cardsRoot) => {
+  const AUTO_REFRESH_INTERVAL = 5 * 60 * 60 * 1000; // 5 часов
+
+  const doRefresh = async (chip, textEl, cardsRoot) => {
     if (!document.contains(chip)) return;
+
+    // Офлайн: сбрасываем таймер (чтобы не зациклиться при каждом запуске),
+    // но не делаем сетевых запросов и не меняем UI
+    if (!navigator.onLine) {
+      setLastUpdated(new Date().toISOString());
+      scheduleAutoRefresh(chip, textEl, cardsRoot);
+      return;
+    }
 
     const animText = (txt) => {
       textEl.classList.remove('text-anim');
@@ -278,22 +289,28 @@
     chip.disabled = true;
     animText('Обновляем...');
 
-    setTimeout(() => {
-      if (!document.contains(chip)) return;
-      const now = new Date().toISOString();
-      setLastUpdated(now);
-      chip.classList.remove('is-refreshing');
-      chip.disabled = false;
-      animText(lastUpdatedAgo(now));
-      renderCards(cardsRoot);
-      scheduleAutoRefresh(chip, textEl, cardsRoot);
-    }, 1800);
+    let changed = false;
+    if (appDb) {
+      try {
+        changed = await syncArticles(appDb);
+        if (changed) window.NEWS = await dbGetAll(appDb);
+      } catch (e) { /* сетевая ошибка — данные не изменились */ }
+    }
+
+    if (!document.contains(chip)) return;
+    const now = new Date().toISOString();
+    setLastUpdated(now);
+    chip.classList.remove('is-refreshing');
+    chip.disabled = false;
+    animText(lastUpdatedAgo(now));
+    if (changed) renderCards(cardsRoot);
+    scheduleAutoRefresh(chip, textEl, cardsRoot);
   };
 
   const scheduleAutoRefresh = (chip, textEl, cardsRoot) => {
     if (updateChipTimer) clearTimeout(updateChipTimer);
     const elapsed = Date.now() - new Date(getLastUpdated());
-    const remaining = 30 * 60 * 1000 - elapsed;
+    const remaining = AUTO_REFRESH_INTERVAL - elapsed;
     if (remaining <= 0) {
       doRefresh(chip, textEl, cardsRoot);
     } else {
@@ -1780,7 +1797,7 @@
   };
 
   // ---------- Анимация обновления ----------
-  const triggerUpdate = () => {
+  const triggerUpdate = (oldVersion, newVersion) => {
     const logoSVG = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
       <style>
         .al-bg { fill: #f2e0ce; } .al-s { stroke: #a83318; }
@@ -1794,11 +1811,20 @@
       </g>
     </svg>`;
 
+    const versionHTML = (oldVersion && newVersion)
+      ? `<div class="update-version" aria-label="${oldVersion} → ${newVersion}">
+           <span class="update-version-old" aria-hidden="true">${oldVersion}</span>
+           <span class="update-version-arrow" aria-hidden="true">→</span>
+           <span class="update-version-new" aria-hidden="true">${newVersion}</span>
+         </div>`
+      : '';
+
     const overlay = document.createElement('div');
     overlay.className = 'update-overlay';
     overlay.innerHTML = `
       <div class="update-overlay-logo" aria-hidden="true">${logoSVG}</div>
       <h2 class="update-overlay-title">Обновление</h2>
+      ${versionHTML}
       <div class="update-progress" role="progressbar">
         <div class="update-progress-fill"></div>
       </div>`;
@@ -1838,6 +1864,7 @@
 
   // Инициализация: загрузить из IndexedDB → отрисовать → синхронизировать с сервером
   openDB().then(async (db) => {
+    appDb = db;
     // 1. Загрузить кэшированные статьи из IndexedDB
     const cached = await dbGetAll(db);
     window.NEWS = cached.length > 0 ? cached : [];
@@ -1878,9 +1905,9 @@
       }
     }
 
-    // Проверка версии приложения (и затем каждые 30 минут)
+    // Проверка версии приложения (и затем каждые 5 часов)
     await checkVersion();
-    setInterval(checkVersion, 30 * 60 * 1000);
+    setInterval(checkVersion, AUTO_REFRESH_INTERVAL);
   }).catch((err) => {
     // IndexedDB недоступна
     console.warn('IndexedDB unavailable:', err);
