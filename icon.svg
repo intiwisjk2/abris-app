@@ -7,8 +7,8 @@
       .a  { stroke: #e87a4f; }
     }
   </style>
-  <rect class="bg" width="512" height="512" rx="112"/>
-  <g class="a" stroke-width="56" stroke-linecap="round" stroke-linejoin="round" fill="none">
+  <rect fill="#f2e0ce" class="bg" width="512" height="512" rx="112"/>
+  <g stroke="#a83318" class="a" stroke-width="56" stroke-linecap="round" stroke-linejoin="round" fill="none">
     <line x1="256" y1="87"  x2="67"  y2="425"/>
     <line x1="256" y1="87"  x2="445" y2="425"/>
     <line x1="148" y1="287" x2="364" y2="287"/>

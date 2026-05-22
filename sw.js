@@ -1,6 +1,6 @@
 // ─── Версия кэша app shell ────────────────────────────────────────
 // Менять вместе с version.txt при каждом релизе
-const CACHE_VERSION = '1.2.02';
+const CACHE_VERSION = '1.2.03';
 // ─────────────────────────────────────────────────────────────────
 
 const SHELL_CACHE    = `abris-shell-${CACHE_VERSION}`;
@@ -14,6 +14,8 @@ const SHELL_FILES = [
   './manifest.webmanifest',
   './icon.svg',
   './icon-maskable.svg',
+  './icon-180.png',
+  './icon-512.png',
   './marked.min.js',
 ];
 
