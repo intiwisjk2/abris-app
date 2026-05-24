@@ -1,6 +1,6 @@
 // ─── Версия кэша app shell ────────────────────────────────────────
 // Менять вместе с version.txt при каждом релизе
-const CACHE_VERSION = '1.2.03';
+const CACHE_VERSION = '1.2.04';
 // ─────────────────────────────────────────────────────────────────
 
 const SHELL_CACHE    = `abris-shell-${CACHE_VERSION}`;

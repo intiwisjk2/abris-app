@@ -1197,37 +1197,37 @@
         text:  'Не следите за лентой круглосуточно — замените это еженедельной сводкой.',
         illus: `<svg viewBox="0 0 320 192" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <rect x="8" y="52" width="38" height="56" rx="7" fill="#1a1a1c" fill-opacity="0.04" stroke="#1a1a1c" stroke-width="0.6" stroke-opacity="0.07"/>
-          <text x="27" y="67" text-anchor="middle" font-size="8" fill="#1a1a1c" fill-opacity="0.35" font-family="system-ui">Пн</text>
+          <text x="27" y="67" text-anchor="middle" font-size="8" fill="#1a1a1c" fill-opacity="0.35" font-family="system-ui">Вт</text>
           <circle cx="20" cy="80" r="4" fill="#a83318" fill-opacity="0.3"/>
           <circle cx="34" cy="80" r="3" fill="#a83318" fill-opacity="0.22"/>
           <circle cx="27" cy="92" r="4.5" fill="#a83318" fill-opacity="0.27"/>
           <rect x="50" y="52" width="38" height="56" rx="7" fill="#1a1a1c" fill-opacity="0.04" stroke="#1a1a1c" stroke-width="0.6" stroke-opacity="0.07"/>
-          <text x="69" y="67" text-anchor="middle" font-size="8" fill="#1a1a1c" fill-opacity="0.35" font-family="system-ui">Вт</text>
+          <text x="69" y="67" text-anchor="middle" font-size="8" fill="#1a1a1c" fill-opacity="0.35" font-family="system-ui">Ср</text>
           <circle cx="62" cy="80" r="3.5" fill="#a83318" fill-opacity="0.28"/>
           <circle cx="76" cy="78" r="4" fill="#a83318" fill-opacity="0.22"/>
           <circle cx="66" cy="91" r="3" fill="#a83318" fill-opacity="0.2"/>
           <rect x="92" y="52" width="38" height="56" rx="7" fill="#1a1a1c" fill-opacity="0.04" stroke="#1a1a1c" stroke-width="0.6" stroke-opacity="0.07"/>
-          <text x="111" y="67" text-anchor="middle" font-size="8" fill="#1a1a1c" fill-opacity="0.35" font-family="system-ui">Ср</text>
+          <text x="111" y="67" text-anchor="middle" font-size="8" fill="#1a1a1c" fill-opacity="0.35" font-family="system-ui">Чт</text>
           <circle cx="104" cy="81" r="4" fill="#a83318" fill-opacity="0.25"/>
           <circle cx="118" cy="80" r="3" fill="#a83318" fill-opacity="0.2"/>
           <circle cx="111" cy="92" r="4" fill="#a83318" fill-opacity="0.28"/>
           <rect x="134" y="52" width="38" height="56" rx="7" fill="#1a1a1c" fill-opacity="0.04" stroke="#1a1a1c" stroke-width="0.6" stroke-opacity="0.07"/>
-          <text x="153" y="67" text-anchor="middle" font-size="8" fill="#1a1a1c" fill-opacity="0.35" font-family="system-ui">Чт</text>
+          <text x="153" y="67" text-anchor="middle" font-size="8" fill="#1a1a1c" fill-opacity="0.35" font-family="system-ui">Пт</text>
           <circle cx="146" cy="80" r="3.5" fill="#a83318" fill-opacity="0.22"/>
           <circle cx="160" cy="79" r="4.5" fill="#a83318" fill-opacity="0.3"/>
           <circle cx="152" cy="91" r="3" fill="#a83318" fill-opacity="0.2"/>
           <rect x="176" y="52" width="38" height="56" rx="7" fill="#1a1a1c" fill-opacity="0.04" stroke="#1a1a1c" stroke-width="0.6" stroke-opacity="0.07"/>
-          <text x="195" y="67" text-anchor="middle" font-size="8" fill="#1a1a1c" fill-opacity="0.35" font-family="system-ui">Пт</text>
+          <text x="195" y="67" text-anchor="middle" font-size="8" fill="#1a1a1c" fill-opacity="0.35" font-family="system-ui">Сб</text>
           <circle cx="188" cy="81" r="4" fill="#a83318" fill-opacity="0.27"/>
           <circle cx="202" cy="80" r="3.5" fill="#a83318" fill-opacity="0.22"/>
           <circle cx="194" cy="92" r="4" fill="#a83318" fill-opacity="0.25"/>
           <rect x="218" y="52" width="38" height="56" rx="7" fill="#1a1a1c" fill-opacity="0.04" stroke="#1a1a1c" stroke-width="0.6" stroke-opacity="0.07"/>
-          <text x="237" y="67" text-anchor="middle" font-size="8" fill="#1a1a1c" fill-opacity="0.35" font-family="system-ui">Сб</text>
+          <text x="237" y="67" text-anchor="middle" font-size="8" fill="#1a1a1c" fill-opacity="0.35" font-family="system-ui">Вс</text>
           <circle cx="230" cy="80" r="3" fill="#a83318" fill-opacity="0.2"/>
           <circle cx="244" cy="81" r="4" fill="#a83318" fill-opacity="0.25"/>
           <circle cx="236" cy="92" r="3.5" fill="#a83318" fill-opacity="0.22"/>
           <rect x="260" y="52" width="52" height="56" rx="7" fill="#f2e0ce" fill-opacity="0.5" stroke="#a83318" stroke-width="1.2" stroke-opacity="0.35"/>
-          <text x="286" y="67" text-anchor="middle" font-size="8" fill="#a83318" fill-opacity="0.8" font-family="system-ui" font-weight="700">Вс</text>
+          <text x="286" y="67" text-anchor="middle" font-size="8" fill="#a83318" fill-opacity="0.8" font-family="system-ui" font-weight="700">Пн</text>
           <rect x="272" y="75" width="28" height="20" rx="3" fill="#a83318" fill-opacity="0.12"/>
           <line x1="286" y1="75" x2="286" y2="95" stroke="#a83318" stroke-width="1" stroke-opacity="0.4"/>
           <rect x="274" y="78" width="10" height="3" rx="1.5" fill="#a83318" fill-opacity="0.35"/>
