@@ -22,10 +22,7 @@
   // ─── Dev-флаг ────────────────────────────────────────────────────
   // true  → показывать экран установки PWA, если открыто не как PWA
   // false → пропускать проверку (для тестирования в браузере)
-  const REQUIRE_PWA = true;
-  // true  → шифрование включено: .enc файлы + enrollment-авторизация
-  // false → режим разработки: .json файлы + старая авторизация
-  const REQUIRE_ENCRYPTION = true;
+  const REQUIRE_PWA = true; // Должно быть true
   // ─────────────────────────────────────────────────────────────────
 
   const app = document.getElementById('app');
@@ -38,10 +35,6 @@
   const AUTH_KEY          = 'auth:authorized';
   const AUTH_DEVICE_KEY   = 'auth:deviceId';
   const AUTH_PASSWORD_KEY = 'auth:password';
-  // Старые константы для режима разработки (REQUIRE_ENCRYPTION = false)
-  const AUTH_CODE_DEV     = 'a3f72c9be8415d0f194bc037e56a8d21f847c392';
-  const AUTH_PASSWORD_DEV = 'o/cs5uhBXQ8Zm8A34FatiR+Ef0csNiR3ZwqP1lY=';
-
   // Случайный device_id — генерируется один раз, хранится навсегда
   const getOrCreateDeviceId = () => {
     let id = localStorage.getItem(AUTH_DEVICE_KEY);
@@ -76,6 +69,7 @@
 
   const applyTheme = (theme) => {
     const html = document.documentElement;
+    html.style.background = '';
     html.classList.remove('theme-light', 'theme-dark');
     if (theme === 'light') html.classList.add('theme-light');
     else if (theme === 'dark') html.classList.add('theme-dark');
@@ -300,7 +294,7 @@
     chip.disabled = true;
     animText('Обновляем...');
 
-    if (REQUIRE_ENCRYPTION && masterKey === null) {
+    if (masterKey === null) {
       const deviceId = localStorage.getItem(AUTH_DEVICE_KEY);
       const password = localStorage.getItem(AUTH_PASSWORD_KEY);
       if (deviceId && password) {
@@ -369,6 +363,32 @@
 
   // ---------- Позиция чтения ----------
   const READPOS_KEY = (id) => `readpos:${id}`;
+
+  const getReadState = (id) => {
+    if (!isRead(id)) return 'new';
+    return localStorage.getItem(READPOS_KEY(id)) != null ? 'reading' : 'read';
+  };
+
+  const applyReadState = (badgeEl, id) => {
+    const state = getReadState(id);
+    badgeEl.classList.remove('read-state-badge--new', 'read-state-badge--reading', 'read-state-badge--read');
+    void badgeEl.offsetWidth;
+    badgeEl.hidden = false;
+    if (state === 'new') {
+      badgeEl.classList.add('read-state-badge--new');
+      badgeEl.textContent = 'Новое';
+      badgeEl.setAttribute('aria-label', 'Новая статья');
+    } else if (state === 'reading') {
+      badgeEl.classList.add('read-state-badge--reading');
+      badgeEl.textContent = 'Читаю';
+      badgeEl.setAttribute('aria-label', 'Читается');
+    } else {
+      badgeEl.classList.add('read-state-badge--read');
+      badgeEl.textContent = 'Прочитано';
+      badgeEl.setAttribute('aria-label', 'Прочитано');
+    }
+  };
+
   let currentArticleId = null;
   let readPosTimer = null;
 
@@ -377,9 +397,13 @@
     const max = doc.scrollHeight - doc.clientHeight;
     if (max <= 0) return;
     const pct = (doc.scrollTop || window.scrollY) / max;
-    if (pct >= 0.95 || pct <= 0.02) {
+    if (pct >= 0.95) {
+      markRead(id);
       localStorage.removeItem(READPOS_KEY(id));
-    } else {
+    } else if (pct <= 0.05) {
+      localStorage.removeItem(READPOS_KEY(id));
+    } else if (getReadState(id) !== 'read') {
+      markRead(id);
       localStorage.setItem(READPOS_KEY(id), pct.toFixed(4));
     }
   };
@@ -393,7 +417,7 @@
     const v = localStorage.getItem(READPOS_KEY(id));
     if (v == null) return;
     const pct = parseFloat(v);
-    if (!isFinite(pct) || pct <= 0.02) return;
+    if (!isFinite(pct) || pct <= 0.05) return;
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const doc = document.documentElement;
       const max = doc.scrollHeight - doc.clientHeight;
@@ -544,12 +568,24 @@
   const renderCards = (root) => {
     root.replaceChildren();
     const items = (window.NEWS || [])
-      .filter((n) => currentFilter === 'all' || n.category === currentFilter)
+      .filter((n) => {
+        if (currentFilter === 'all') return true;
+        if (currentFilter === 'new') return getReadState(n.id) === 'new';
+        if (currentFilter === 'reading') return getReadState(n.id) === 'reading';
+        return true;
+      })
       .slice()
       .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
 
     if (items.length === 0) {
-      if (!articlesLoaded) renderSkeletons(root);
+      if (!articlesLoaded) { renderSkeletons(root); return; }
+      if (currentFilter !== 'all') {
+        const emptyIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>`;
+        const li = document.createElement('li');
+        li.className = 'empty-state';
+        li.innerHTML = `<div class="empty-state__icon">${emptyIcon}</div><p class="empty-state__title">Тут пусто</p>`;
+        root.appendChild(li);
+      }
       return;
     }
 
@@ -571,9 +607,24 @@
       badge.textContent = CATEGORY_LABEL[n.category];
       badge.classList.add(n.category);
 
-      if (!isRead(n.id)) {
-        const nb = node.querySelector('.js-new-badge');
-        if (nb) nb.hidden = false;
+      const readBadge = node.querySelector('.js-read-badge');
+      if (readBadge) {
+        applyReadState(readBadge, n.id);
+        readBadge.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const state = getReadState(n.id);
+          if (state === 'new') {
+            markRead(n.id);
+            localStorage.removeItem(READPOS_KEY(n.id));
+          } else if (state === 'reading') {
+            localStorage.removeItem(READPOS_KEY(n.id));
+          } else {
+            localStorage.removeItem(`read:${n.id}`);
+            localStorage.removeItem(READPOS_KEY(n.id));
+          }
+          applyReadState(readBadge, n.id);
+        });
       }
       time.textContent = timeAgoShort(n.publishedAt);
       title.textContent = n.title;
@@ -663,7 +714,6 @@
   const renderArticle = (id) => {
     clearUpdateChipTimers();
     removeScrollTopBtn();
-    markRead(id);
     const item = (window.NEWS || []).find((n) => n.id === id);
     if (!item) {
       app.innerHTML = `
@@ -1447,7 +1497,7 @@
     const errorEl       = app.querySelector('.js-auth-error');
     const errorText     = app.querySelector('.js-auth-error-text');
 
-    codeEl.textContent = REQUIRE_ENCRYPTION ? getOrCreateDeviceId() : AUTH_CODE_DEV;
+    codeEl.textContent = getOrCreateDeviceId();
 
     // ── Утилита перехода между шагами ──
     const goToStep = (from, to) => {
@@ -1465,7 +1515,7 @@
 
     // ── Копирование кода ──
     const copyCode = async () => {
-      const codeToCopy = REQUIRE_ENCRYPTION ? getOrCreateDeviceId() : AUTH_CODE_DEV;
+      const codeToCopy = getOrCreateDeviceId();
       try {
         if (navigator.clipboard && window.isSecureContext) {
           await navigator.clipboard.writeText(codeToCopy);
@@ -1546,51 +1596,30 @@
       pasteSubmit.classList.add('is-loading');
       pasteSubmit.disabled = true;
 
-      if (REQUIRE_ENCRYPTION) {
-        // Боевой режим: проверяем через enrollment-файл
-        const deviceId = getOrCreateDeviceId();
-        try {
-          masterKey = await loadMasterKey(deviceId, password);
-          markAuthorized(password);
-          pasteSubmit.classList.remove('is-loading');
-          pasteSubmit.disabled = false;
-          isChecking = false;
-          if (!isOnboardingDone()) {
-            renderOnboarding(() => { markOnboardingDone(); window.location.reload(); });
-          } else {
-            setTimeout(() => window.location.reload(), 240);
-          }
-        } catch (err) {
-          masterKey = null;
-          pasteSubmit.classList.remove('is-loading');
-          pasteSubmit.disabled = false;
-          isChecking = false;
-          if (err.code === 'not-enrolled') {
-            showError('Устройство не зарегистрировано. Отправьте код владельцу.');
-          } else if (err.code === 'timeout') {
-            showError('Нет соединения с сервером — попробуйте позже');
-          } else {
-            showError('Неверный пароль');
-          }
+      const deviceId = getOrCreateDeviceId();
+      try {
+        masterKey = await loadMasterKey(deviceId, password);
+        markAuthorized(password);
+        pasteSubmit.classList.remove('is-loading');
+        pasteSubmit.disabled = false;
+        isChecking = false;
+        if (!isOnboardingDone()) {
+          renderOnboarding(() => { markOnboardingDone(); window.location.reload(); });
+        } else {
+          setTimeout(() => window.location.reload(), 240);
         }
-      } else {
-        // Режим разработки: проверяем старым способом
-        setTimeout(() => {
-          pasteSubmit.classList.remove('is-loading');
-          pasteSubmit.disabled = false;
-          isChecking = false;
-
-          if (password !== AUTH_PASSWORD_DEV) {
-            showError('Неверный пароль — попробуйте ещё раз');
-            return;
-          }
-          markAuthorized();
-          if (!isOnboardingDone()) {
-            renderOnboarding(() => { markOnboardingDone(); window.location.reload(); });
-          } else {
-            setTimeout(() => window.location.reload(), 240);
-          }
-        }, 1200);
+      } catch (err) {
+        masterKey = null;
+        pasteSubmit.classList.remove('is-loading');
+        pasteSubmit.disabled = false;
+        isChecking = false;
+        if (err.code === 'not-enrolled') {
+          showError('Устройство не зарегистрировано. Отправьте код владельцу.');
+        } else if (err.code === 'timeout') {
+          showError('Нет соединения с сервером — попробуйте позже');
+        } else {
+          showError('Неверный пароль');
+        }
       }
     });
   };
@@ -1602,16 +1631,8 @@
     window.scrollTo(0, 0);
 
     const logoSVG = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-      <style>
-        .al-bg { fill: #f2e0ce; }
-        .al-s  { stroke: #a83318; }
-        @media (prefers-color-scheme: dark) {
-          .al-bg { fill: #1a1a1f; }
-          .al-s  { stroke: #e87a4f; }
-        }
-      </style>
-      <rect class="al-bg" width="100" height="100"/>
-      <g class="al-s" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <rect style="fill: var(--logo-bg)" width="100" height="100" rx="25"/>
+      <g style="stroke: var(--logo-stroke)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none">
         <line x1="50" y1="17" x2="13" y2="83"/>
         <line x1="50" y1="17" x2="87" y2="83"/>
         <line x1="28" y1="56" x2="72" y2="56"/>
@@ -1813,16 +1834,9 @@
     const toFetch = serverIndex.filter(id => !localMap.has(id));
     await Promise.all(toFetch.map(async (id) => {
       try {
-        let article;
-        if (REQUIRE_ENCRYPTION) {
-          const res = await fetch(`articles/${id}.enc`, { cache: 'no-store' });
-          if (!res.ok) throw new Error(res.status);
-          article = await decryptArticle(await res.arrayBuffer());
-        } else {
-          const res = await fetch(`articles/${id}.json`, { cache: 'no-store' });
-          if (!res.ok) throw new Error(res.status);
-          article = await res.json();
-        }
+        const res = await fetch(`articles/${id}.enc`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(res.status);
+        const article = await decryptArticle(await res.arrayBuffer());
         await dbPut(db, article);
         localMap.set(article.id, article);
         changed = true;
@@ -1849,12 +1863,8 @@
   // ---------- Анимация обновления ----------
   const triggerUpdate = (oldVersion, newVersion) => {
     const logoSVG = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-      <style>
-        .al-bg { fill: #f2e0ce; } .al-s { stroke: #a83318; }
-        @media (prefers-color-scheme: dark) { .al-bg { fill: #1a1a1f; } .al-s { stroke: #e87a4f; } }
-      </style>
-      <rect class="al-bg" width="100" height="100"/>
-      <g class="al-s" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <rect style="fill: var(--logo-bg)" width="100" height="100" rx="25"/>
+      <g style="stroke: var(--logo-stroke)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none">
         <line x1="50" y1="17" x2="13" y2="83"/>
         <line x1="50" y1="17" x2="87" y2="83"/>
         <line x1="28" y1="56" x2="72" y2="56"/>

@@ -22,7 +22,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
-    <script>!function(){try{var t=localStorage.getItem('pref:theme');if(t==='dark')document.documentElement.classList.add('theme-dark');else if(t==='light')document.documentElement.classList.add('theme-light');}catch(e){}}();</script>
+    <script>!function(){try{var t=localStorage.getItem('pref:theme'),d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.style.background=d?'#1a1a1f':'#fafaf7';if(t==='dark')document.documentElement.classList.add('theme-dark');else if(t==='light')document.documentElement.classList.add('theme-light');}catch(e){}}();</script>
     <title>Абрис</title>
   </head>
   <body>
@@ -33,16 +33,8 @@
     <div id="splash" aria-hidden="true">
       <div class="splash-logo">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
-          <style>
-            .sl-bg { fill: #f2e0ce; }
-            .sl-a  { stroke: #a83318; }
-            @media (prefers-color-scheme: dark) {
-              .sl-bg { fill: #232329; }
-              .sl-a  { stroke: #e87a4f; }
-            }
-          </style>
-          <rect class="sl-bg" width="512" height="512" rx="112"/>
-          <g class="sl-a" stroke-width="56" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <rect style="fill: var(--logo-bg)" width="512" height="512" rx="112"/>
+          <g style="stroke: var(--logo-stroke)" stroke-width="56" stroke-linecap="round" stroke-linejoin="round" fill="none">
             <line x1="256" y1="87"  x2="67"  y2="425"/>
             <line x1="256" y1="87"  x2="445" y2="425"/>
             <line x1="148" y1="287" x2="364" y2="287"/>
@@ -59,16 +51,8 @@
         <div class="auth-card">
           <div class="auth-logo" aria-hidden="true">
             <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-              <style>
-                .al-bg { fill: #f2e0ce; }
-                .al-s  { stroke: #a83318; }
-                @media (prefers-color-scheme: dark) {
-                  .al-bg { fill: #1a1a1f; }
-                  .al-s  { stroke: #e87a4f; }
-                }
-              </style>
-              <rect class="al-bg" width="100" height="100"/>
-              <g class="al-s" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none">
+              <rect style="fill: var(--logo-bg)" width="100" height="100" rx="25"/>
+              <g style="stroke: var(--logo-stroke)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none">
                 <line x1="50" y1="17" x2="13" y2="83"/>
                 <line x1="50" y1="17" x2="87" y2="83"/>
                 <line x1="28" y1="56" x2="72" y2="56"/>
@@ -153,9 +137,8 @@
         <p class="brand-sub">Автоматический дайджест из открытых СМИ · не редакционный материал</p>
         <nav class="filters" role="tablist" aria-label="Фильтр категорий">
           <button class="filter is-active" data-filter="all" role="tab">Все</button>
-          <button class="filter" data-filter="front" role="tab">СВО</button>
-          <button class="filter" data-filter="russia" role="tab">Россия</button>
-          <button class="filter" data-filter="world" role="tab">Мир</button>
+          <button class="filter" data-filter="new" role="tab">Новое</button>
+          <button class="filter" data-filter="reading" role="tab">Читаю</button>
         </nav>
       </header>
       <ul class="cards" id="cards"></ul>
@@ -167,7 +150,7 @@
           <div class="card-top">
             <div class="card-top-left">
               <span class="badge"></span>
-              <span class="new-badge js-new-badge" hidden aria-label="Новая статья">Новое</span>
+              <span class="read-state-badge js-read-badge" hidden aria-label=""></span>
             </div>
             <span class="card-time"></span>
           </div>

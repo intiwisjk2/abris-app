@@ -1,6 +1,6 @@
 // ─── Версия кэша app shell ────────────────────────────────────────
 // Менять вместе с version.txt при каждом релизе
-const CACHE_VERSION = '1.2.04';
+const CACHE_VERSION = '1.2.06';
 // ─────────────────────────────────────────────────────────────────
 
 const SHELL_CACHE    = `abris-shell-${CACHE_VERSION}`;
@@ -54,30 +54,45 @@ self.addEventListener('fetch', (e) => {
 
   const path = url.pathname;
 
-  // version.txt — Network-first, fallback на кеш офлайн (не пропускаем мимо SW)
-  if (path.endsWith('version.txt')) {
+  // Навигационные запросы — всегда из кэша, никогда не идём в сеть первыми.
+  // Это предотвращает iOS WKWebView alert «режим офлайн» при холодном старте.
+  if (request.mode === 'navigate') {
     e.respondWith(
-      fetch(request, { cache: 'no-store' })
-        .then(res => {
-          const clone = res.clone();
-          caches.open(SHELL_CACHE).then(c => c.put(request, clone));
-          return res;
-        })
-        .catch(() => caches.match(request))
+      caches.match('./index.html')
+        .then(cached => cached || fetch(request))
+        .catch(() => caches.match('./index.html'))
     );
     return;
   }
 
-  // articles/index.json — Network-first, кэш как fallback при офлайн
+  // version.txt — Network-first только если онлайн, иначе сразу из кэша
+  if (path.endsWith('version.txt')) {
+    e.respondWith(
+      navigator.onLine
+        ? fetch(request, { cache: 'no-store' })
+            .then(res => {
+              const clone = res.clone();
+              caches.open(SHELL_CACHE).then(c => c.put(request, clone));
+              return res;
+            })
+            .catch(() => caches.match(request))
+        : caches.match(request)
+    );
+    return;
+  }
+
+  // articles/index.json — Network-first только если онлайн, иначе сразу из кэша
   if (path.endsWith('articles/index.json')) {
     e.respondWith(
-      fetch(request, { cache: 'no-store' })
-        .then(res => {
-          const clone = res.clone();
-          caches.open(ARTICLES_CACHE).then(c => c.put(request, clone));
-          return res;
-        })
-        .catch(() => caches.match(request))
+      navigator.onLine
+        ? fetch(request, { cache: 'no-store' })
+            .then(res => {
+              const clone = res.clone();
+              caches.open(ARTICLES_CACHE).then(c => c.put(request, clone));
+              return res;
+            })
+            .catch(() => caches.match(request))
+        : caches.match(request)
     );
     return;
   }
@@ -97,21 +112,24 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // App shell (HTML, JS, CSS, иконки) — Cache-first + фоновое обновление.
-  // Сразу отдаём из кеша → нет белого экрана. Обновляем кеш в фоне.
+  // App shell (HTML, JS, CSS, иконки) — Cache-first + фоновое обновление только онлайн.
+  // Сразу отдаём из кеша → нет белого экрана. Фоновый fetch не запускаем офлайн.
   e.respondWith(
     caches.match(request).then(cached => {
-      const networkFetch = fetch(request, { cache: 'no-store' })
-        .then(res => {
-          if (res.ok) {
-            const clone = res.clone();
-            caches.open(SHELL_CACHE).then(c => c.put(request, clone));
-          }
-          return res;
-        })
-        .catch(() => cached);
-
-      return cached || networkFetch;
+      if (cached) {
+        if (navigator.onLine) {
+          fetch(request, { cache: 'no-store' })
+            .then(res => {
+              if (res.ok) {
+                const clone = res.clone();
+                caches.open(SHELL_CACHE).then(c => c.put(request, clone));
+              }
+            })
+            .catch(() => {});
+        }
+        return cached;
+      }
+      return fetch(request);
     })
   );
 });
