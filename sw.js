@@ -1,6 +1,6 @@
 // ─── Версия кэша app shell ────────────────────────────────────────
 // Менять вместе с version.txt при каждом релизе
-const CACHE_VERSION = '1.2.06';
+const CACHE_VERSION = '1.2.07';
 // ─────────────────────────────────────────────────────────────────
 
 const SHELL_CACHE    = `abris-shell-${CACHE_VERSION}`;
@@ -12,6 +12,7 @@ const SHELL_FILES = [
   './app.js',
   './styles.css',
   './manifest.webmanifest',
+  './version.txt',
   './icon.svg',
   './icon-maskable.svg',
   './icon-180.png',
@@ -20,10 +21,17 @@ const SHELL_FILES = [
 ];
 
 // ── Установка: кэшируем app shell ────────────────────────────────
+// Кэшируем по одному файлу (allSettled): сбой одного ресурса не должен
+// срывать весь install и оставлять приложение без офлайна.
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(SHELL_CACHE)
-      .then(cache => cache.addAll(SHELL_FILES))
+      .then(cache => Promise.allSettled(
+        SHELL_FILES.map(f => cache.add(f).catch(err => {
+          console.warn('[SW] Не удалось закэшировать', f, err);
+          throw err;
+        }))
+      ))
       .then(() => self.skipWaiting()) // сразу активируемся, не ждём закрытия вкладок
   );
 });
@@ -44,6 +52,37 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// Network-first с таймаутом: пытаемся сеть (не дольше timeoutMs), при успехе
+// кладём свежий ответ в кэш и отдаём его, при ошибке/таймауте/офлайне — кэш.
+// Не зависим от navigator.onLine (ненадёжен на iOS) → новые статьи всегда
+// подтягиваются при наличии сети, а офлайн получает мгновенный фолбэк из кэша.
+function networkFirst(request, cacheName, timeoutMs = 3500) {
+  const fromCache = () => caches.match(request);
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (val) => { if (!settled) { settled = true; resolve(val); } };
+
+    const timer = setTimeout(() => { fromCache().then(c => { if (c) done(c); }); }, timeoutMs);
+
+    fetch(request, { cache: 'no-store' })
+      .then(res => {
+        clearTimeout(timer);
+        if (res && res.ok) {
+          const clone = res.clone();
+          caches.open(cacheName).then(c => c.put(request, clone));
+          done(res);
+        } else {
+          // сервер ответил ошибкой — пробуем кэш, иначе отдаём как есть
+          fromCache().then(c => done(c || res));
+        }
+      })
+      .catch(() => {
+        clearTimeout(timer);
+        fromCache().then(c => done(c || Response.error()));
+      });
+  });
+}
+
 // ── Fetch: стратегии по типам запросов ───────────────────────────
 self.addEventListener('fetch', (e) => {
   const request = e.request;
@@ -54,46 +93,26 @@ self.addEventListener('fetch', (e) => {
 
   const path = url.pathname;
 
-  // Навигационные запросы — всегда из кэша, никогда не идём в сеть первыми.
-  // Это предотвращает iOS WKWebView alert «режим офлайн» при холодном старте.
+  // Навигационные запросы — всегда из кэша, никогда не идём в падающий fetch.
+  // Это предотвращает нативный экран iOS «нет интернета» при холодном старте.
   if (request.mode === 'navigate') {
     e.respondWith(
       caches.match('./index.html')
-        .then(cached => cached || fetch(request))
-        .catch(() => caches.match('./index.html'))
+        .then(cached => cached || caches.match('./'))
+        .then(cached => cached || fetch(request).catch(() => caches.match('./index.html')))
     );
     return;
   }
 
-  // version.txt — Network-first только если онлайн, иначе сразу из кэша
+  // version.txt — network-first с таймаутом, фолбэк на кэш
   if (path.endsWith('version.txt')) {
-    e.respondWith(
-      navigator.onLine
-        ? fetch(request, { cache: 'no-store' })
-            .then(res => {
-              const clone = res.clone();
-              caches.open(SHELL_CACHE).then(c => c.put(request, clone));
-              return res;
-            })
-            .catch(() => caches.match(request))
-        : caches.match(request)
-    );
+    e.respondWith(networkFirst(request, SHELL_CACHE));
     return;
   }
 
-  // articles/index.json — Network-first только если онлайн, иначе сразу из кэша
+  // articles/index.json — network-first с таймаутом, фолбэк на кэш
   if (path.endsWith('articles/index.json')) {
-    e.respondWith(
-      navigator.onLine
-        ? fetch(request, { cache: 'no-store' })
-            .then(res => {
-              const clone = res.clone();
-              caches.open(ARTICLES_CACHE).then(c => c.put(request, clone));
-              return res;
-            })
-            .catch(() => caches.match(request))
-        : caches.match(request)
-    );
+    e.respondWith(networkFirst(request, ARTICLES_CACHE));
     return;
   }
 
@@ -112,21 +131,20 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // App shell (HTML, JS, CSS, иконки) — Cache-first + фоновое обновление только онлайн.
-  // Сразу отдаём из кеша → нет белого экрана. Фоновый fetch не запускаем офлайн.
+  // App shell (HTML, JS, CSS, иконки) — Cache-first + фоновое обновление.
+  // Сразу отдаём из кеша → нет белого экрана. Фоновый fetch безопасен офлайн
+  // (быстро реджектится по .catch), а при наличии сети обновляет кэш.
   e.respondWith(
     caches.match(request).then(cached => {
       if (cached) {
-        if (navigator.onLine) {
-          fetch(request, { cache: 'no-store' })
-            .then(res => {
-              if (res.ok) {
-                const clone = res.clone();
-                caches.open(SHELL_CACHE).then(c => c.put(request, clone));
-              }
-            })
-            .catch(() => {});
-        }
+        fetch(request, { cache: 'no-store' })
+          .then(res => {
+            if (res.ok) {
+              const clone = res.clone();
+              caches.open(SHELL_CACHE).then(c => c.put(request, clone));
+            }
+          })
+          .catch(() => {});
         return cached;
       }
       return fetch(request);

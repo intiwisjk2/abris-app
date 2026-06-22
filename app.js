@@ -318,7 +318,12 @@
     if (appDb) {
       try {
         changed = await syncArticles(appDb);
-        if (changed) window.NEWS = await dbGetAll(appDb);
+        if (changed) {
+          window.NEWS = await dbGetAll(appDb);
+          // новые/удалённые статьи → сбрасываем сохранённую позицию списка
+          // (без принудительной прокрутки: текущего читателя не дёргаем)
+          clearListScroll();
+        }
       } catch (e) { /* сетевая ошибка — данные не изменились */ }
     }
     articlesLoaded = true;
@@ -362,11 +367,16 @@
   };
 
   // ---------- Позиция чтения ----------
-  const READPOS_KEY = (id) => `readpos:${id}`;
+  const READPOS_KEY  = (id) => `readpos:${id}`;   // % прокрутки (только позиция)
+  const READDONE_KEY = (id) => `readdone:${id}`;  // явный признак «дочитано»
 
+  // Статус развязан с позицией: readpos живёт и у «прочитанных» статей,
+  // чтобы при повторном открытии восстанавливался скролл.
   const getReadState = (id) => {
     if (!isRead(id)) return 'new';
-    return localStorage.getItem(READPOS_KEY(id)) != null ? 'reading' : 'read';
+    if (localStorage.getItem(READDONE_KEY(id)) === '1') return 'read'; // явно дочитано
+    if (localStorage.getItem(READPOS_KEY(id)) != null) return 'reading';
+    return 'read'; // легаси: isRead без позиции = прочитано
   };
 
   const applyReadState = (badgeEl, id) => {
@@ -398,11 +408,17 @@
     if (max <= 0) return;
     const pct = (doc.scrollTop || window.scrollY) / max;
     if (pct >= 0.95) {
+      // дочитал до конца — помечаем «прочитано» и удаляем позицию,
+      // чтобы при повторном открытии статья открывалась с начала
       markRead(id);
+      localStorage.setItem(READDONE_KEY(id), '1');
       localStorage.removeItem(READPOS_KEY(id));
     } else if (pct <= 0.05) {
+      // вверху страницы — восстанавливать нечего; статус не трогаем
       localStorage.removeItem(READPOS_KEY(id));
-    } else if (getReadState(id) !== 'read') {
+    } else {
+      // читает в середине — сохраняем позицию; readdone не меняем, чтобы
+      // открытие «прочитанной» статьи случайно не сбрасывало её статус
       markRead(id);
       localStorage.setItem(READPOS_KEY(id), pct.toFixed(4));
     }
@@ -499,6 +515,37 @@
   // true после первой синхронизации или если в IndexedDB уже были статьи
   let articlesLoaded = false;
 
+  // ---------- Позиция прокрутки списка ----------
+  // Запоминаем, докуда промотан главный экран (как в новостных приложениях):
+  // открыл статью → вернулся → список на том же месте; переживает перезапуск.
+  const LIST_SCROLL_KEY = 'app:listScroll';
+  let isListView = false;
+  let listScrollTimer = null;
+
+  const saveListScroll = () => {
+    const y = Math.round(window.scrollY || document.documentElement.scrollTop || 0);
+    localStorage.setItem(LIST_SCROLL_KEY, String(y));
+  };
+  const scheduleListScrollSave = () => {
+    if (listScrollTimer) clearTimeout(listScrollTimer);
+    listScrollTimer = setTimeout(() => { listScrollTimer = null; saveListScroll(); }, 300);
+  };
+  const clearListScroll = () => localStorage.removeItem(LIST_SCROLL_KEY);
+  const restoreListScroll = () => {
+    const v = localStorage.getItem(LIST_SCROLL_KEY);
+    const y = v == null ? 0 : (parseInt(v, 10) || 0);
+    if (y <= 0) { window.scrollTo(0, 0); return; }
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const doc = document.documentElement;
+      const max = doc.scrollHeight - doc.clientHeight;
+      window.scrollTo(0, Math.max(0, Math.min(y, max)));
+    }));
+  };
+
+  window.addEventListener('scroll', () => {
+    if (isListView) scheduleListScrollSave();
+  }, { passive: true });
+
   const renderList = () => {
     clearUpdateChipTimers();
     detachReadingProgress();
@@ -514,6 +561,8 @@
         currentFilter = btn.dataset.filter;
         filters.forEach((b) => b.classList.toggle('is-active', b === btn));
         renderCards(cards);
+        clearListScroll();        // другой набор карточек → сброс к верху
+        window.scrollTo(0, 0);
       });
     });
 
@@ -523,7 +572,8 @@
     const chip = app.querySelector('.js-update-chip');
     if (chip) setupUpdateChip(chip, cards);
 
-    window.scrollTo(0, 0);
+    restoreListScroll();
+    isListView = true;
     app.classList.remove('page-enter');
     void app.offsetWidth;
     app.classList.add('page-enter');
@@ -615,12 +665,17 @@
           e.stopPropagation();
           const state = getReadState(n.id);
           if (state === 'new') {
+            // новое → прочитано (позиции нет)
             markRead(n.id);
+            localStorage.setItem(READDONE_KEY(n.id), '1');
             localStorage.removeItem(READPOS_KEY(n.id));
           } else if (state === 'reading') {
-            localStorage.removeItem(READPOS_KEY(n.id));
+            // читаю → прочитано; позицию оставляем для восстановления скролла
+            localStorage.setItem(READDONE_KEY(n.id), '1');
           } else {
+            // прочитано → новое (полный сброс)
             localStorage.removeItem(`read:${n.id}`);
+            localStorage.removeItem(READDONE_KEY(n.id));
             localStorage.removeItem(READPOS_KEY(n.id));
           }
           applyReadState(readBadge, n.id);
@@ -1902,7 +1957,23 @@
   window.__abrisSkeleton = () => { indexedDB.deleteDatabase(DB_NAME); location.reload(); };
 
   // ---------- Старт ----------
+  // Запоминаем последний экран, чтобы восстановить его после перезагрузки
+  // (iOS выгружает PWA из памяти и перезагружает start_url без hash).
+  const LAST_ROUTE_KEY = 'app:lastRoute';
+  const saveLastRoute = () => {
+    const h = location.hash || '#/';
+    if (h === '#/' || /^#\/article\/[\w-]+$/.test(h)) {
+      localStorage.setItem(LAST_ROUTE_KEY, h);
+    }
+  };
+
   const route = () => {
+    // Уходим со списка → зафиксировать его позицию (DOM ещё прежний)
+    if (isListView) {
+      if (listScrollTimer) { clearTimeout(listScrollTimer); listScrollTimer = null; }
+      saveListScroll();
+      isListView = false;
+    }
     if (REQUIRE_PWA && !isPWA()) {
       const device = detectDevice();
       if (device) { renderInstall(device); return; }
@@ -1911,6 +1982,7 @@
       renderAuth();
       return;
     }
+    saveLastRoute();
     const r = parseRoute();
     if (r.name === 'article') {
       renderArticle(r.id);
@@ -1922,11 +1994,38 @@
 
   window.addEventListener('hashchange', route);
 
+  // Сброс позиции чтения и маршрута при сворачивании/выгрузке — страховка от
+  // iOS, который может убить webview до срабатывания debounce-таймера сохранения.
+  const flushState = () => {
+    if (currentArticleId) {
+      if (readPosTimer) { clearTimeout(readPosTimer); readPosTimer = null; }
+      saveReadPosNow(currentArticleId);
+    }
+    if (isListView) {
+      if (listScrollTimer) { clearTimeout(listScrollTimer); listScrollTimer = null; }
+      saveListScroll();
+    }
+    saveLastRoute();
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushState();
+  });
+  window.addEventListener('pagehide', flushState);
+
   openDB().then(async (db) => {
     appDb = db;
     const cached = await dbGetAll(db);
     window.NEWS = cached.length > 0 ? cached : [];
     if (cached.length > 0) articlesLoaded = true;
+
+    // Восстановление последнего экрана: если приложение открылось без hash
+    // (холодный старт / перезагрузка iOS), а ранее читали статью — вернёмся к ней.
+    if ((!location.hash || location.hash === '#/') && isAuthorized()) {
+      const last = localStorage.getItem(LAST_ROUTE_KEY);
+      if (last && /^#\/article\/[\w-]+$/.test(last)) {
+        history.replaceState(null, '', last); // без лишнего hashchange
+      }
+    }
 
     route();
     requestAnimationFrame(() => requestAnimationFrame(() => {
