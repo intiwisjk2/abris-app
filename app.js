@@ -496,6 +496,21 @@
     return `${s.getDate()} ${MONTHS_GEN[s.getMonth()]} — ${e.getDate()} ${MONTHS_GEN[e.getMonth()]}`;
   };
 
+  // Ключ календарного дня (по локальному времени) — для группировки ленты
+  const dayKey = (iso) => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  };
+
+  // Подпись разделителя дня: «7 июня» (с годом, если год не текущий)
+  const formatDaySep = (iso) => {
+    const d = new Date(iso);
+    const base = `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
+    return d.getFullYear() === new Date().getFullYear()
+      ? base
+      : `${base} ${d.getFullYear()}`;
+  };
+
   const estimateReadMinutes = (markdown) => {
     const words = markdown.replace(/[#>*`_\-\[\]\(\)]/g, ' ').split(/\s+/).filter(Boolean).length;
     const min = Math.max(1, Math.round(words / 180));
@@ -615,6 +630,29 @@
     root.appendChild(frag);
   };
 
+  // Счётчики постов по состояниям на вкладках «Новое»/«Читаю»
+  const setFilterCount = (sel, val) => {
+    const el = app.querySelector(sel);
+    if (!el) return;
+    if (val > 0) {
+      el.textContent = val > 99 ? '99+' : String(val);
+      el.hidden = false;
+    } else {
+      el.textContent = '';
+      el.hidden = true;
+    }
+  };
+  const updateFilterCounts = () => {
+    let nNew = 0, nReading = 0;
+    for (const n of (window.NEWS || [])) {
+      const st = getReadState(n.id);
+      if (st === 'new') nNew++;
+      else if (st === 'reading') nReading++;
+    }
+    setFilterCount('.js-count-new', nNew);
+    setFilterCount('.js-count-reading', nReading);
+  };
+
   const renderCards = (root) => {
     root.replaceChildren();
     const items = (window.NEWS || [])
@@ -642,7 +680,19 @@
     const tpl = document.getElementById('tpl-card');
     const frag = document.createDocumentFragment();
 
+    let prevDayKey = null;
     items.forEach((n) => {
+      const curDayKey = dayKey(n.publishedAt);
+      // Разделитель ставим перед сменой дня, но не перед самой свежей группой
+      if (prevDayKey !== null && curDayKey !== prevDayKey) {
+        const sep = document.createElement('li');
+        sep.className = 'day-sep';
+        sep.setAttribute('role', 'separator');
+        sep.innerHTML = `<span class="day-sep__label">${formatDaySep(n.publishedAt)}</span>`;
+        frag.appendChild(sep);
+      }
+      prevDayKey = curDayKey;
+
       const node = tpl.content.cloneNode(true);
       const link = node.querySelector('.card-link');
       const badge = node.querySelector('.badge');
@@ -679,6 +729,7 @@
             localStorage.removeItem(READPOS_KEY(n.id));
           }
           applyReadState(readBadge, n.id);
+          updateFilterCounts();
         });
       }
       time.textContent = timeAgoShort(n.publishedAt);
@@ -697,6 +748,7 @@
     });
 
     root.appendChild(frag);
+    updateFilterCounts();
   };
 
   // ---------- Статья ----------

@@ -48,7 +48,7 @@
     --russia: #7ec8a8;
     --russia-soft: #1d3d2c;
     --world: #c4a8f8;
-    --world-soft: #2c2065;
+    --world-soft: #3a2d82;
     --quote: #e87a4f;
     --code-bg: #2b2b32;
     --shadow: 0 1px 0 rgba(0, 0, 0, 0.25), 0 6px 18px -8px rgba(0, 0, 0, 0.45);
@@ -195,13 +195,14 @@ html.no-scrollbar::-webkit-scrollbar { display: none; }
 
 .filters {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
 }
 .filter {
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
   padding: 9px 12px;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -224,6 +225,28 @@ html.no-scrollbar::-webkit-scrollbar { display: none; }
   color: var(--bg);
   border-color: var(--text);
 }
+/* Счётчик постов на вкладке («Мягкая капсула») */
+.filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  vertical-align: middle;
+}
+.filter.is-active .filter-count {
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  color: var(--text);
+}
+.filter-count[hidden] { display: none; }
 
 /* Controls group on the right of brand-row */
 .brand-controls {
@@ -296,6 +319,25 @@ html.no-scrollbar::-webkit-scrollbar { display: none; }
   padding: 0;
   display: grid;
   gap: 12px;
+}
+.day-sep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 4px;
+}
+.day-sep::before,
+.day-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.day-sep__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+  white-space: nowrap;
 }
 .card {
   background: var(--surface);
@@ -731,10 +773,14 @@ html.theme-dark .read-state-badge--reading {
   margin: 2em 0;
 }
 .article-body table {
-  width: 100%;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
   font-size: 14.5px;
   margin: 1em 0;
+  -webkit-overflow-scrolling: touch;
 }
 .article-body th, .article-body td {
   border: 1px solid var(--border);
