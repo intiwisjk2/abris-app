@@ -1927,14 +1927,28 @@
     const localArticles = await dbGetAll(db);
     const localMap = new Map(localArticles.map(a => [a.id, a]));
 
-    // Удалить из IndexedDB статьи, которых больше нет на сервере
-    let changed = false;
-    for (const id of localMap.keys()) {
-      if (!serverIds.has(id)) {
-        await dbDelete(db, id);
-        localMap.delete(id);
-        changed = true;
+    // Удалить из IndexedDB статьи, которых больше нет на сервере.
+    // ВАЖНО: index.json может быть устаревшим/неполным (лаг деплоя GitHub Pages,
+    // CDN-кэш, фолбэк SW на старый кэш). Полный индекс ВСЕГДА содержит новейшие
+    // статьи, поэтому если локальная статья свежее всего, что индекс вообще
+    // перечисляет, — индекс не догнал, и удалять её нельзя (иначе теряем свежак).
+    let newestConfirmed = 0;
+    for (const a of localArticles) {
+      if (serverIds.has(a.id)) {
+        const t = new Date(a.publishedAt).getTime();
+        if (t > newestConfirmed) newestConfirmed = t;
       }
+    }
+    let changed = false;
+    for (const a of localArticles) {
+      if (serverIds.has(a.id)) continue;
+      if (new Date(a.publishedAt).getTime() > newestConfirmed) {
+        console.warn(`[sync] Не удаляю ${a.id}: её нет в index.json, но она свежее всего индекса — вероятно, index.json устарел.`);
+        continue;
+      }
+      await dbDelete(db, a.id);
+      localMap.delete(a.id);
+      changed = true;
     }
 
     // Скачать новые статьи (которых нет в IndexedDB)
