@@ -192,6 +192,9 @@
     try {
       const res = await fetch('version.txt', { cache: 'no-store' });
       if (!res.ok) return;
+      // Офлайн SW отдаёт version.txt из кэша (помечен заголовком) — такой ответ
+      // не повод перезагружаться: иначе «обновление» и reload без сети.
+      if (res.headers.get('X-Abris-From-Cache') === '1') return;
       const version = (await res.text()).trim();
       const stored = localStorage.getItem(VERSION_KEY);
       localStorage.setItem(VERSION_KEY, version);
